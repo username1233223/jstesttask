@@ -1,25 +1,47 @@
 import dgram from 'dgram';
-export class UdpService {
+import {EventEmitter} from 'events';
+import { UdpMessage } from './types';
+import { DEFAULT_UDP_SERVER_PORT, SOCKET_EVENTS, UDP_BROADCAST_ADDRESS, UDP_PROTOCOL_MESSAGES, UDP_STATE } from './constants';
+
+export class UdpService extends EventEmitter {
     readonly port: number;
-    #socket = dgram.createSocket('udp4');
+    #socket: dgram.Socket;
     constructor(port: number) {
+      super();
       this.port = port;
-    }
-    listen(): void {  
-      this.#socket.on('error', (err) => {
+      this.#socket = dgram.createSocket('udp4');
+
+      this.#socket.on(SOCKET_EVENTS.LISTENING, () => {
+        this.#socket.setBroadcast(true);
+        const address = this.#socket.address();
+        this.emit(UDP_STATE.UDP_STATE_READY, `UDP socket ready on ${address.address}:${address.port}`);
+      });
+
+      this.#socket.on(SOCKET_EVENTS.ERROR, (err) => {
         console.log(`Error: ${err.stack} ${err}`);
         this.#socket.close();
+        this.emit(UDP_STATE.UDP_STATE_ERROR, `Error: ${err.stack} ${err}`);
       });
-  
-      this.#socket.on('message', (msg, rinfo) => {
-        console.log(`Received message from ${rinfo.address}:${rinfo.port}: ${msg}`);
-      });
-  
-      this.#socket.on('listening', () => {
-        const address = this.#socket.address();
-        console.log(`UDP server listening on ${address.address}:${address.port}`);
-      });
-  
+
+      this.#socket.on(SOCKET_EVENTS.MESSAGE, (msg, rinfo) => {
+        try {
+            const message: UdpMessage = JSON.parse(msg.toString());
+            message.content = {
+              ...(message.content || {}),
+              address: rinfo.address,
+              port: rinfo.port
+            };
+            this.emit(message.type, message.content);
+        } catch (error) {
+            this.emit(UDP_PROTOCOL_MESSAGES.RESULT_ERROR, `Error parsing message: ${error}`);
+        }
+      }); 
+      this.on(UDP_STATE.UDP_STATE_READY, this.handleSocketError);
+      this.on(UDP_STATE.UDP_STATE_ERROR, this.handleSocketError);
+    }
+    protected handleSocketError = (data: string) => {console.log(data)};
+
+    listen(): void {  
       this.#socket.bind(this.port);
     }
     send(address: string, port: number, message: any): void {
@@ -27,6 +49,7 @@ export class UdpService {
       this.#socket.send(msgString, port, address);
     }
     broadcast(port: number, message: any): void {
-      this.send('255.255.255.255', port, message);
+      this.send(UDP_BROADCAST_ADDRESS, port, message);
     }
+    
   }

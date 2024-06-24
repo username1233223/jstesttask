@@ -5,8 +5,10 @@
   "scripts": {
     "tsc": "tsc",
     "build": "tsc --build",
-    "start": "node ./dist", 
-    "dev": "tsx src/index"
+    "client": "node ./dist/client",
+    "server": "node ./dist/server",
+    "client-dev": "tsx src/client/index",
+    "server-dev": "tsx src/server/index"
   },
   "author": "",
   "license": "ISC",
