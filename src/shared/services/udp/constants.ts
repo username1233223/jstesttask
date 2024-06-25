@@ -16,6 +16,14 @@ export enum UDP_STATE {
     RESULT_ERROR = "result_error",
   }
 
+  export enum UDP_RESULT_ERROR{
+    RECONNECT_NEED ="reconnect_need",
+    WRONG_ARGUMENTS = "wrong_arguments",
+    NO_SUCH_FUNCTION = "no_such_function",
+    NO_SUCH_CLIENT = "no_such_client",
+    CALL_FUNCTION_TIMEOUT = "call_function_timeout"
+  }
+
   export enum SOCKET_EVENTS {
     LISTENING = "listening",
     ERROR = "error",

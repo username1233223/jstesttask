@@ -1,11 +1,14 @@
+import { resolve } from 'path';
 import { UdpService } from '../../../shared/services/udp';
-import { CHECK_INTERVAL, DEFAULT_UDP_SERVER_PORT, INACTIVITY_THRESHOLD, UDP_BROADCAST_ADDRESS, UDP_PROTOCOL_MESSAGES } from '../../../shared/services/udp/constants';
+import { CHECK_INTERVAL, DEFAULT_UDP_SERVER_PORT, INACTIVITY_THRESHOLD, UDP_BROADCAST_ADDRESS, UDP_PROTOCOL_MESSAGES, UDP_RESULT_ERROR } from '../../../shared/services/udp/constants';
 import { ClientInfo } from './types';
+import { time } from 'console';
+import { randomUUID } from 'crypto';
 
 class UdpServerService extends UdpService {
     #clients: Map<string, ClientInfo>;
     #cleanupInterval: NodeJS.Timeout;
-    #handleHello(content: any){
+    async #handleHello(content: any){
       this.#clients.set(content.clientId, {
         address: content.address,
         port: content.port,
@@ -15,7 +18,19 @@ class UdpServerService extends UdpService {
       });
       console.log(`Client with id ${content.clientId} is connected from ${content.address} and provides ${content.capacities.join(', ')}`);
       this.send(content.address, content.port, {type: UDP_PROTOCOL_MESSAGES.RESULT_OK});
-      };
+      try{
+        const result_hdd = await this.callFunction("hddSpeed", content.clientId);
+        console.log(result_hdd);
+        const result_memory = await this.callFunction("freeMemory", content.clientId);
+        console.log(result_memory);
+        const result_random = await this.callFunction("randomNumber", content.clientId);
+        console.log(result_random);
+      }
+      catch(error)
+      {
+        console.log(error);
+      }
+      }
     #handleHeartbeat(content: any) {
         const client = this.#clients.get(content.clientId);
         
@@ -25,10 +40,13 @@ class UdpServerService extends UdpService {
         } else {
           this.send(content.address, content.port, {
             type: UDP_PROTOCOL_MESSAGES.RESULT_ERROR,
-            content: "reconnect_needed"
+            content: {
+              error: UDP_RESULT_ERROR.RECONNECT_NEED
+            }
           });
         }
       }
+
     #cleanupInactiveClients() {
       const now = Date.now();
   
@@ -43,7 +61,6 @@ class UdpServerService extends UdpService {
       super(port);
       this.on(UDP_PROTOCOL_MESSAGES.HELLO, this.#handleHello);
       this.on(UDP_PROTOCOL_MESSAGES.HEARTBEAT, this.#handleHeartbeat);
-
       this.#cleanupInterval = setInterval(() => this.#cleanupInactiveClients(), CHECK_INTERVAL);
       this.#clients= new Map();
 
@@ -57,7 +74,75 @@ class UdpServerService extends UdpService {
               })
             );
         }
+    async callFunction(functionName: string, clientId: string, args?:any[]): Promise<any>{
+      const clientInfo = this.#clients.get(clientId);
+      if (!clientInfo)
+        {
+          this.emit(UDP_PROTOCOL_MESSAGES.RESULT_ERROR, {error: UDP_RESULT_ERROR.NO_SUCH_CLIENT});
+          return;
+        }
+      else{
+        const capacities = clientInfo.capacities;
+        if (!capacities.includes(functionName))
+          {
+            this.emit(UDP_PROTOCOL_MESSAGES.RESULT_ERROR, {error: UDP_RESULT_ERROR.NO_SUCH_FUNCTION});
+            return;
+          }
+        const promiseSend = new Promise<any>((resolve, reject) => {
+          const messageId = randomUUID();
+          const timeout = setTimeout(() => {
+            reject({
+              messageId: messageId,
+              functionName: functionName,
+              clientId: clientId,
+              error: UDP_RESULT_ERROR.CALL_FUNCTION_TIMEOUT
+            });
+          }, INACTIVITY_THRESHOLD);
+          const okHandler = (content: any) => {
+            if (messageId == content.messageId){
+              clearTimeout(timeout);
+              resolve(content)
+            }
+            else{
+              this.once(UDP_PROTOCOL_MESSAGES.RESULT_OK, okHandler);
+            }
+          };
+          const errorHandler = (content: any) => {
+            if (messageId == content.messageId){
+              clearTimeout(timeout);
+              reject(content);
+            }
+            else{
+              this.once(UDP_PROTOCOL_MESSAGES.RESULT_ERROR, errorHandler);
+            }
+          };
 
+          this.once(UDP_PROTOCOL_MESSAGES.RESULT_OK, okHandler);
+          this.once(UDP_PROTOCOL_MESSAGES.RESULT_ERROR, errorHandler);
+
+          this.send(clientInfo.address, clientInfo.port, {
+            type: UDP_PROTOCOL_MESSAGES.CALL_FUNCTION,
+            content: {
+             messageId: messageId,
+             functionName: functionName,
+             args: args
+            } 
+           });
+        });
+        return await promiseSend.then((content)=>{
+
+          console.log(`Remote function ${content.functionName} on ${content.clientId} returned ${content.result}`);
+          return content.result;
+        }).catch((content)=>{
+          console.log(`Remote function ${content.functionName} on ${content.clientId} returned an error ${content.error}`);
+          if(content.error == UDP_RESULT_ERROR.CALL_FUNCTION_TIMEOUT){
+            this.#clients.delete(clientId);
+            console.log(`Client with id ${clientId} is no longer available`);
+          }
+          throw Error(content.error);
+        })
+      }
+    }// скорее всего можно упростить
   }
 
   
