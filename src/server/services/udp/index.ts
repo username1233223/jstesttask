@@ -18,18 +18,6 @@ class UdpServerService extends UdpService {
       });
       console.log(`Client with id ${content.clientId} is connected from ${content.address} and provides ${content.capacities.join(', ')}`);
       this.send(content.address, content.port, {type: UDP_PROTOCOL_MESSAGES.RESULT_OK});
-      try{
-        const result_hdd = await this.callFunction("hddSpeed", content.clientId);
-        console.log(result_hdd);
-        const result_memory = await this.callFunction("freeMemory", content.clientId);
-        console.log(result_memory);
-        const result_random = await this.callFunction("randomNumber", content.clientId);
-        console.log(result_random);
-      }
-      catch(error)
-      {
-        console.log(error);
-      }
       }
     #handleHeartbeat(content: any) {
         const client = this.#clients.get(content.clientId);
@@ -119,7 +107,6 @@ class UdpServerService extends UdpService {
 
           this.once(UDP_PROTOCOL_MESSAGES.RESULT_OK, okHandler);
           this.once(UDP_PROTOCOL_MESSAGES.RESULT_ERROR, errorHandler);
-
           this.send(clientInfo.address, clientInfo.port, {
             type: UDP_PROTOCOL_MESSAGES.CALL_FUNCTION,
             content: {
