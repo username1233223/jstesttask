@@ -62,7 +62,7 @@ class UdpServerService extends UdpService {
               })
             );
         }
-    async callFunction(functionName: string, clientId: string, args?:any[]): Promise<any>{
+    async callFunction(functionName: string, clientId: string, args?:string[]): Promise<any>{
       const clientInfo = this.#clients.get(clientId);
       if (!clientInfo)
         {
@@ -129,7 +129,7 @@ class UdpServerService extends UdpService {
           throw Error(content.error);
         })
       }
-    }// скорее всего можно упростить
+    }
   }
 
   

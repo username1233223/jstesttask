@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import {ClientsController} from '../controllers/clients';
 import {Middleware} from '../middlewares';
+import { UDP_RESULT_ERROR } from '../../shared/services/udp/constants';
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ export function startRouter(port:number):any
         const client = ClientsController.getUdpClients().find(c => c.clientId === clientId);
         
         if (!client) {
-            throw new Error("No such client.");
+            throw new Error(UDP_RESULT_ERROR.NO_SUCH_CLIENT);
         }
         return {
             capacities: client.capacities,

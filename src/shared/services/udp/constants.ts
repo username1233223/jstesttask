@@ -24,6 +24,15 @@ export enum UDP_STATE {
     NO_SUCH_CLIENT = "no_such_client",
     CALL_FUNCTION_TIMEOUT = "call_function_timeout"
   }
+  export enum KEYPROTECTED_ERROR {
+    KEYPROTECTED_MISSING_KEYFILE = 'keyprotected_missing_keyfile',
+    KEYPROTECTED_KEY_TOO_SHORT = 'keyprotected_key_too_short',
+    KEYPROTECTED_KEY_TOO_LONG = 'keyprotected_key_too_long',
+    KEYPROTECTED_WRONG_PASSWORD = 'keyprotected_wrong_password',
+    KEYPROTECTED_PASSWORD_REQUIRED = 'keyprotected_password_required',
+    KEYPROTECTED_NO_CALLBACK = 'no_callback_specified'
+  }
+
   export enum SOCKET_EVENTS {
     LISTENING = "listening",
     ERROR = "error",

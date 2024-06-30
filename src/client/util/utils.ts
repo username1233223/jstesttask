@@ -8,6 +8,7 @@ export namespace Util
     function randomNumber(min: number = 0, max: number = 100): number {
       const numberMin = Number(min);
       const numberMax = Number(max);
+      console.log(min,  max)
         if (numberMin > numberMax) {
           throw new Error(UDP_RESULT_ERROR.WRONG_ARGUMENTS);
         }
