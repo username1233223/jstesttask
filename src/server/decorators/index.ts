@@ -3,10 +3,13 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { defaultAuthKey } from './config';
 import { KEYPROTECTED_ERROR } from '../../shared/services/udp/constants';
+import { Middleware } from '../middlewares';
+import { Request, Response} from 'express';
+import { ApiCallback } from '../services/udp/types';
 
 export function keyProtected(keyPath?: string) {
   return function (
-    target: any,
+    target: Middleware,
     propertyKey: string,
     descriptor: PropertyDescriptor
   ) {
@@ -58,10 +61,9 @@ export function keyProtected(keyPath?: string) {
       
       keyContent = '';
 
+    descriptor.value =  async function (req:Request, res:Response, callback:ApiCallback) {
 
-    descriptor.value =  async function (...args: any[]) {
-
-        const key = args?.[0].query?.key || undefined;
+        const key = req.query.key?.toString() || undefined;
         if(!key)
         {
             throw new Error(KEYPROTECTED_ERROR.KEYPROTECTED_PASSWORD_REQUIRED);
@@ -70,8 +72,7 @@ export function keyProtected(keyPath?: string) {
         if (providedKeyHash != storedKeyHash) {
             throw new Error(KEYPROTECTED_ERROR.KEYPROTECTED_WRONG_PASSWORD);
           }
-
-      return await originalMethod.apply(this, args);
+      return await originalMethod.apply(this, [req, res, callback]);
     };
 
     return descriptor;

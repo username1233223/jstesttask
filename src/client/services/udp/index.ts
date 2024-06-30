@@ -1,7 +1,9 @@
 import { UdpService } from "../../../shared/services/udp";
 import { randomUUID } from 'crypto';
-import { CHECK_INTERVAL, CLIENT_STATE, DEFAULT_UDP_SERVER_PORT, INACTIVITY_THRESHOLD, UDP_BROADCAST_ADDRESS, UDP_PROTOCOL_MESSAGES, UDP_RESULT_ERROR } from "../../../shared/services/udp/constants";
+import { CHECK_INTERVAL, CLIENT_STATE, DEFAULT_UDP_SERVER_PORT, INACTIVITY_THRESHOLD, UDP_BROADCAST_ADDRESS, UDP_PROTOCOL_MESSAGES, UDP_RESULT_ERROR, UDP_STATE } from "../../../shared/services/udp/constants";
 import {Util, utilFunctions} from "../../util/utils"
+import { Content } from "../../../shared/services/udp/types";
+
 class UdpClientService extends UdpService {
     #serverPort: number;
     #clientId: string;
@@ -11,22 +13,45 @@ class UdpClientService extends UdpService {
     #checkConnectionInterval: NodeJS.Timeout;
     #pingServerInterval: NodeJS.Timeout;
     #lastConnectedServerAddress: string;
-    #handleOk(content: any){
+    #handleOk(content: Content){
+        const address = content.address;
+        const port = content.port;
+        this.checkAddressPort(address, port);
         if (this.#state != CLIENT_STATE.CONNECTED)
         {
-            console.log(`Server found on ${content.address}:${content.port}`);
+            console.log(`Server found on ${address}:${port}`);
         }
         this.#state = CLIENT_STATE.CONNECTED;
         this.#lastHeartbeat = Date.now();
-        this.#lastConnectedServerAddress = content.address;
+        this.#lastConnectedServerAddress = address!;
         };
-    #handleError(content: any){
-            console.log(`Got RESULT_ERROR from ${content.address}:${content.port}, error: ${content.error}`);
+    #handleError(content: Content){
+        const address = content.address;
+        const port = content.port;
+        this.checkAddressPort(address, port);
+        console.log(`Got RESULT_ERROR from ${address}:${port}, error: ${content.error}`);
         };
-    async #handleCallFunction(content: any){
-        if (!this.#capacities.includes(content.functionName))
+    async #handleCallFunction(content: Content){
+        const address = content.address;
+        const port = content.port;
+        const functionName = content.functionName;
+        this.checkAddressPort(address, port);
+
+        if(!functionName)
+            {
+              this.send(address!, port!, {
+                type: UDP_PROTOCOL_MESSAGES.RESULT_ERROR,
+                content: {
+                    messageId: content.messageId,
+                    clientId: this.#clientId,
+                    functionName: content.functionName,
+                    error: UDP_RESULT_ERROR.NO_SUCH_FUNCTION
+                }});
+              return;
+            }
+        if (!this.#capacities.includes(functionName))
         {
-            this.send(content.address, content.port, {type: UDP_PROTOCOL_MESSAGES.RESULT_ERROR, content: {
+            this.send(address!, port!, {type: UDP_PROTOCOL_MESSAGES.RESULT_ERROR, content: {
                 messageId: content.messageId,
                 clientId: this.#clientId,
                 functionName: content.functionName,
@@ -34,24 +59,32 @@ class UdpClientService extends UdpService {
             }});
             return;
         }
-        const func = utilFunctions[content.functionName];
+        const func = utilFunctions[functionName];
         try{
             const result = await func(content.query);
-            this.send(content.address, content.port, {type: UDP_PROTOCOL_MESSAGES.RESULT_OK, content: {
+            this.send(address!, port!, {type: UDP_PROTOCOL_MESSAGES.RESULT_OK, content: {
                 messageId: content.messageId,
                 clientId: this.#clientId,
                 functionName: content.functionName,
                 result: result
             }});
         }
-        catch(error)
+        catch(error: unknown)
         {
-            this.send(content.address, content.port, {type: UDP_PROTOCOL_MESSAGES.RESULT_ERROR, content: {
-                messageId: content.messageId,
-                clientId: this.#clientId,
-                functionName: content.functionName,
-                error: `${error}`
-            }});
+            if(error instanceof Error)
+            {
+                this.send(address!, port!, {type: UDP_PROTOCOL_MESSAGES.RESULT_ERROR, content: {
+                    messageId: content.messageId,
+                    clientId: this.#clientId,
+                    functionName: content.functionName,
+                    error: `${error.message}`
+                }});
+            }
+            else
+            {
+                throw new Error(`Got an error which is not an instance of Error: ${error}`);
+            }
+
         }
         };
     #checkConnection() {

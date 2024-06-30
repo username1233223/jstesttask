@@ -1,32 +1,67 @@
-import { resolve } from 'path';
 import { UdpService } from '../../../shared/services/udp';
-import { CHECK_INTERVAL, DEFAULT_UDP_SERVER_PORT, INACTIVITY_THRESHOLD, UDP_BROADCAST_ADDRESS, UDP_PROTOCOL_MESSAGES, UDP_RESULT_ERROR } from '../../../shared/services/udp/constants';
+import { CHECK_INTERVAL, DEFAULT_UDP_SERVER_PORT, INACTIVITY_THRESHOLD, UDP_BROADCAST_ADDRESS, UDP_PROTOCOL_MESSAGES, UDP_RESULT_ERROR, UDP_STATE } from '../../../shared/services/udp/constants';
 import { ClientInfo } from './types';
-import { time } from 'console';
 import { randomUUID } from 'crypto';
+import { Content, Result } from '../../../shared/services/udp/types';
+import { ParsedQs } from "qs";
 
 class UdpServerService extends UdpService {
     #clients: Map<string, ClientInfo>;
     #cleanupInterval: NodeJS.Timeout;
-    async #handleHello(content: any){
-      this.#clients.set(content.clientId, {
-        address: content.address,
-        port: content.port,
-        capacities: content.capacities,
-        lastHeartbeat: Date.now(),
-        logo: content.logo
-      });
-      console.log(`Client with id ${content.clientId} is connected from ${content.address} and provides ${content.capacities.join(', ')}`);
-      this.send(content.address, content.port, {type: UDP_PROTOCOL_MESSAGES.RESULT_OK});
+    async #handleHello(content: Content){
+      const clientId = content.clientId;
+      const capacities = content.capacities || [];
+      const address = content.address;
+      const port = content.port;
+      
+      this.checkAddressPort(address, port);
+      if(!clientId)
+        {
+          this.send(address!, port!, {
+            type: UDP_PROTOCOL_MESSAGES.RESULT_ERROR,
+            content: {
+              error: UDP_RESULT_ERROR.MISSING_CLIENT_ID
+            }});
+          return;
+        }
+
+        this.#clients.set(clientId, {
+          address: address!,
+          port: port!,
+          capacities: capacities,
+          lastHeartbeat: Date.now(),
+          logo: content.logo
+        });
+        console.log(`Client with id ${clientId} is connected from ${address} and provides ${capacities.join(', ')}`);
+        this.send(address!, port!, {type: UDP_PROTOCOL_MESSAGES.RESULT_OK});
+
+
       }
-    #handleHeartbeat(content: any) {
-        const client = this.#clients.get(content.clientId);
+      
+
+    #handleHeartbeat(content: Content) {
+      const clientId = content.clientId;
+      const capacities = content.capacities || [];
+      const address = content.address;
+      const port = content.port;
+      this.checkAddressPort(address, port);
+      if(!clientId)
+        {
+          this.send(address!, port!, {
+            type: UDP_PROTOCOL_MESSAGES.RESULT_ERROR,
+            content: {
+              error: UDP_RESULT_ERROR.MISSING_CLIENT_ID
+            }});
+          return;
+        }
+        
+        const client = this.#clients.get(clientId);
         
         if (client) {
           client.lastHeartbeat = Date.now();
-          this.send(content.address, content.port, { type: UDP_PROTOCOL_MESSAGES.RESULT_OK });
+          this.send(address!, port!, { type: UDP_PROTOCOL_MESSAGES.RESULT_OK });
         } else {
-          this.send(content.address, content.port, {
+          this.send(address!, port!, {
             type: UDP_PROTOCOL_MESSAGES.RESULT_ERROR,
             content: {
               error: UDP_RESULT_ERROR.RECONNECT_NEED
@@ -39,7 +74,7 @@ class UdpServerService extends UdpService {
       const now = Date.now();
   
       this.#clients.forEach((client, clientId) => {
-        if (now - client.lastHeartbeat > INACTIVITY_THRESHOLD) {
+        if (now - client.lastHeartbeat! > INACTIVITY_THRESHOLD) {
           this.#clients.delete(clientId);
           console.log(`Client with id ${clientId} is no longer available`);
         }
@@ -54,29 +89,28 @@ class UdpServerService extends UdpService {
 
   }
 
-    get clients(): any[] {
+    get clients(): ClientInfo[] {
         return Array.from(this.#clients).map(([id, data])=>({
                 clientId: id,
                 capacities: data.capacities,
-                address: `${data.address}:${data.port}`
+                address: `${data.address}:${data.port}`,
+                logo: data.logo
               })
             );
         }
-    async callFunction(functionName: string, clientId: string, query?:string[]): Promise<any>{
+    async callFunction(functionName: string, clientId: string, query?:ParsedQs): Promise<Result>{
       const clientInfo = this.#clients.get(clientId);
       if (!clientInfo)
         {
-          this.emit(UDP_PROTOCOL_MESSAGES.RESULT_ERROR, {error: UDP_RESULT_ERROR.NO_SUCH_CLIENT});
-          return;
+          throw new Error(UDP_RESULT_ERROR.NO_SUCH_CLIENT);
         }
       else{
         const capacities = clientInfo.capacities;
         if (!capacities.includes(functionName))
           {
-            this.emit(UDP_PROTOCOL_MESSAGES.RESULT_ERROR, {error: UDP_RESULT_ERROR.NO_SUCH_FUNCTION});
-            return;
+            throw new Error(UDP_RESULT_ERROR.NO_SUCH_FUNCTION);
           }
-        const promiseSend = new Promise<any>((resolve, reject) => {
+        const promiseSend = new Promise<Content>((resolve, reject) => {
           const messageId = randomUUID();
           const timeout = setTimeout(() => {
             reject({
@@ -86,7 +120,7 @@ class UdpServerService extends UdpService {
               error: UDP_RESULT_ERROR.CALL_FUNCTION_TIMEOUT
             });
           }, INACTIVITY_THRESHOLD);
-          const okHandler = (content: any) => {
+          const okHandler = (content: Content) => {
             if (messageId == content.messageId){
               this.off(UDP_PROTOCOL_MESSAGES.RESULT_ERROR, errorHandler);
               clearTimeout(timeout);
@@ -97,7 +131,7 @@ class UdpServerService extends UdpService {
               this.once(UDP_PROTOCOL_MESSAGES.RESULT_OK, okHandler);
             }
           };
-          const errorHandler = (content: any) => {
+          const errorHandler = (content: Content) => {
             if (messageId == content.messageId){
               this.off(UDP_PROTOCOL_MESSAGES.RESULT_ERROR, okHandler);
               clearTimeout(timeout);
@@ -110,7 +144,7 @@ class UdpServerService extends UdpService {
 
           this.once(UDP_PROTOCOL_MESSAGES.RESULT_OK, okHandler);
           this.once(UDP_PROTOCOL_MESSAGES.RESULT_ERROR, errorHandler);
-          this.send(clientInfo.address, clientInfo.port, {
+          this.send(clientInfo.address!, clientInfo.port!, {
             type: UDP_PROTOCOL_MESSAGES.CALL_FUNCTION,
             content: {
              messageId: messageId,
@@ -129,7 +163,7 @@ class UdpServerService extends UdpService {
             this.#clients.delete(clientId);
             console.log(`Client with id ${clientId} is no longer available`);
           }
-          throw Error(content.error);
+          throw new Error(content.error);
         })
       }
     }

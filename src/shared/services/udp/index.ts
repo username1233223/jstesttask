@@ -5,9 +5,7 @@ import { DEFAULT_UDP_SERVER_PORT, SOCKET_EVENTS, UDP_BROADCAST_ADDRESS, UDP_PROT
 
 export class UdpService extends EventEmitter {
     readonly port: number;
-    #socket: dgram.Socket;
-
-      
+    #socket: dgram.Socket;      
     constructor(port: number) {
       super();
       this.port = port;
@@ -33,23 +31,35 @@ export class UdpService extends EventEmitter {
               port: rinfo.port
             };
             this.emit(message.type, message.content);
-        } catch (error) {
-            this.emit(UDP_STATE.UDP_STATE_ERROR, `Socket error(parsing): ${error}`);
+        } catch (error: unknown) {
+          if(error instanceof Error)
+            {
+              this.emit(UDP_STATE.UDP_STATE_ERROR, `Socket error(parsing): ${error.message}`);
+            }
+            else{
+              throw new Error(`Got an error which is not an instance of Error: ${error}`);
+            }
         }
       }); 
       this.on(UDP_STATE.UDP_STATE_READY, this.handleSocketEvent);
       this.on(UDP_STATE.UDP_STATE_ERROR, this.handleSocketEvent);
     }
     protected handleSocketEvent = (data: string) => {console.log(data)};
-
+    protected checkAddressPort(address?:string, port?:number): void{
+      if(!address || !port)
+        {
+          this.emit(UDP_STATE.UDP_STATE_ERROR, `Missing address/port: ${address}:${port}`);
+          return;
+        }
+    }
     start(): void {  
       this.#socket.bind(this.port);
     }
-    send(address: string, port: number, message: any): void {
+    send(address: string, port: number, message: UdpMessage): void {
       const msgString = JSON.stringify(message);
       this.#socket.send(msgString, port, address);
     }
-    broadcast(port: number, message: any): void {
+    broadcast(port: number, message: UdpMessage): void {
       this.send(UDP_BROADCAST_ADDRESS, port, message);
     }
     

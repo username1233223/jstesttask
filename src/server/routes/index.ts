@@ -5,7 +5,7 @@ import { UDP_RESULT_ERROR } from '../../shared/services/udp/constants';
 
 const router = express.Router();
 
-export function startRouter(port:number):any
+export function startRouter(port:number):void
 {
     router.get('/', Middleware.withApiResponse(async (req: Request, res: Response) => {
         return ClientsController.getUdpClients();
@@ -13,7 +13,7 @@ export function startRouter(port:number):any
     
     router.get('/:clientId', Middleware.withApiResponse(async (req: Request, res: Response) => {
         const clientId = req.params.clientId;
-        const client = ClientsController.getUdpClients().find(c => c.clientId === clientId);
+        const client = ClientsController.getUdpClients().find(c => c.clientId == clientId);
         
         if (!client) {
             throw new Error(UDP_RESULT_ERROR.NO_SUCH_CLIENT);
@@ -27,7 +27,9 @@ export function startRouter(port:number):any
     router.get('/:clientId/:functionName', Middleware.withApiResponse(async (req: Request, res: Response) => {
         const { clientId, functionName } = req.params;
         const query = req.query;
-        return ClientsController.callClientFunction(clientId, functionName, query);
+        return {
+            result: await ClientsController.callClientFunction(clientId, functionName, query)
+        }
     }));
     
     router.use(Middleware.errorHandlerMiddleware);

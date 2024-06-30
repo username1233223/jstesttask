@@ -22,7 +22,9 @@ export enum UDP_STATE {
     WRONG_ARGUMENTS = "wrong_arguments",
     NO_SUCH_FUNCTION = "no_such_function",
     NO_SUCH_CLIENT = "no_such_client",
-    CALL_FUNCTION_TIMEOUT = "call_function_timeout"
+    CALL_FUNCTION_TIMEOUT = "call_function_timeout",
+    MISSING_CLIENT_ID = "missing_client_id",
+    MISSING_FUNCTION_NAME = "missing_function_name"
   }
   export enum KEYPROTECTED_ERROR {
     KEYPROTECTED_MISSING_KEYFILE = 'keyprotected_missing_keyfile',
