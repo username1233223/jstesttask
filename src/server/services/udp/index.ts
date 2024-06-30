@@ -88,8 +88,10 @@ class UdpServerService extends UdpService {
           }, INACTIVITY_THRESHOLD);
           const okHandler = (content: any) => {
             if (messageId == content.messageId){
+              this.off(UDP_PROTOCOL_MESSAGES.RESULT_ERROR, errorHandler);
               clearTimeout(timeout);
               resolve(content)
+              
             }
             else{
               this.once(UDP_PROTOCOL_MESSAGES.RESULT_OK, okHandler);
@@ -97,6 +99,7 @@ class UdpServerService extends UdpService {
           };
           const errorHandler = (content: any) => {
             if (messageId == content.messageId){
+              this.off(UDP_PROTOCOL_MESSAGES.RESULT_ERROR, okHandler);
               clearTimeout(timeout);
               reject(content);
             }

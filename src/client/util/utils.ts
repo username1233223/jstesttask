@@ -22,7 +22,7 @@ export class Util
     static async hddSpeed(): Promise<number> {
         const tempDir = os.tmpdir();
         const tempFile = path.join(tempDir, 'speedtest.tmp');
-        const oneMB = 1024*1024;
+        const oneMB = 1024*1024*1024;
         const data = Buffer.alloc(oneMB, '0');
 
         const start = Date.now();
