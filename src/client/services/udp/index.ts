@@ -1,7 +1,7 @@
 import { UdpService } from "../../../shared/services/udp";
 import { randomUUID } from 'crypto';
 import { CHECK_INTERVAL, CLIENT_STATE, DEFAULT_UDP_SERVER_PORT, INACTIVITY_THRESHOLD, UDP_BROADCAST_ADDRESS, UDP_PROTOCOL_MESSAGES, UDP_RESULT_ERROR } from "../../../shared/services/udp/constants";
-import {Util} from "../../util/utils"
+import {Util, utilFunctions} from "../../util/utils"
 class UdpClientService extends UdpService {
     #serverPort: number;
     #clientId: string;
@@ -34,9 +34,9 @@ class UdpClientService extends UdpService {
             }});
             return;
         }
-        const func = Util.utilFunctions[content.functionName];
+        const func = utilFunctions[content.functionName];
         try{
-            const result = await func(...(content.args ?? []));
+            const result = await func(content.query);
             this.send(content.address, content.port, {type: UDP_PROTOCOL_MESSAGES.RESULT_OK, content: {
                 messageId: content.messageId,
                 clientId: this.#clientId,

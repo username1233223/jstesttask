@@ -26,8 +26,8 @@ export function startRouter(port:number):any
     
     router.get('/:clientId/:functionName', Middleware.withApiResponse(async (req: Request, res: Response) => {
         const { clientId, functionName } = req.params;
-        const args = Object.values(req.query);
-        return ClientsController.callClientFunction(clientId, functionName, args);
+        const query = req.query;
+        return ClientsController.callClientFunction(clientId, functionName, query);
     }));
     
     router.use(Middleware.errorHandlerMiddleware);

@@ -4,7 +4,7 @@ import * as crypto from 'crypto';
 import { defaultAuthKey } from './config';
 import { KEYPROTECTED_ERROR } from '../../shared/services/udp/constants';
 
- function keyProtected(keyPath?: string) {
+export function keyProtected(keyPath?: string) {
   return function (
     target: any,
     propertyKey: string,
@@ -41,7 +41,6 @@ import { KEYPROTECTED_ERROR } from '../../shared/services/udp/constants';
               }
         }
         else{
-            console.log(defaultAuthKey.toString());
             keyContent = defaultAuthKey.toString();
         }
 
@@ -78,5 +77,3 @@ import { KEYPROTECTED_ERROR } from '../../shared/services/udp/constants';
     return descriptor;
   };
 }
-
-export { keyProtected };

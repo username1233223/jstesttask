@@ -2,13 +2,14 @@ import os from 'os';
 import path from 'path';
 import fs from "fs/promises";
 import { UDP_RESULT_ERROR } from '../../shared/services/udp/constants';
+import { applyToQuery } from '../decorators';
 
-export namespace Util
+export class Util
 {
-    function randomNumber(min: number = 0, max: number = 100): number {
+    @applyToQuery('min', 'max')
+    static randomNumber(min: number = 0, max: number = 100): number {
       const numberMin = Number(min);
       const numberMax = Number(max);
-      console.log(min,  max)
         if (numberMin > numberMax) {
           throw new Error(UDP_RESULT_ERROR.WRONG_ARGUMENTS);
         }
@@ -16,7 +17,9 @@ export namespace Util
           return Math.floor(Math.random() * (numberMax - numberMin + 1)) + numberMin;
         }
       }
-    async function hddSpeed(): Promise<number> {
+    
+    @applyToQuery()
+    static async hddSpeed(): Promise<number> {
         const tempDir = os.tmpdir();
         const tempFile = path.join(tempDir, 'speedtest.tmp');
         const oneMB = 1024*1024;
@@ -27,14 +30,15 @@ export namespace Util
         const end = Date.now();
         return end - start;
         }
-    function freeMemory(): number {
+      
+    @applyToQuery()
+    static freeMemory(): number {
         return os.freemem();
         }
-  
-    export const utilFunctions: Record<string, Function> = {
-      'randomNumber': randomNumber,
-      'hddSpeed': hddSpeed,
-      'freeMemory': freeMemory
-    }
 }
-
+ 
+export const utilFunctions: Record<string, Function> = {
+  'randomNumber': Util.randomNumber,
+  'hddSpeed': Util.hddSpeed,
+  'freeMemory': Util.freeMemory
+};
