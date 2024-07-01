@@ -43,7 +43,7 @@ class UdpClientService extends UdpService {
     const functionName = content.functionName;
     this.checkAddressPort(address, port);
 
-    if (!functionName) {
+    if (!functionName || !this.#capacities.includes(functionName)) {
       this.send(address!, port!, {
         type: UDP_PROTOCOL_MESSAGES.RESULT_ERROR,
         content: {
@@ -55,18 +55,7 @@ class UdpClientService extends UdpService {
       });
       return;
     }
-    if (!this.#capacities.includes(functionName)) {
-      this.send(address!, port!, {
-        type: UDP_PROTOCOL_MESSAGES.RESULT_ERROR,
-        content: {
-          messageId: content.messageId,
-          clientId: this.#clientId,
-          functionName: content.functionName,
-          error: UDP_RESULT_ERROR.NO_SUCH_FUNCTION,
-        },
-      });
-      return;
-    }
+
     const func = utilFunctions[functionName];
     try {
       const result = await func(content.query);

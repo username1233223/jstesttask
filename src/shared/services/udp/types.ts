@@ -1,6 +1,6 @@
 import { ParsedQs } from 'qs';
 
-export type Result = string | undefined;
+export type Result = number | undefined;
 export interface Content {
   messageId?: string;
   address?: string;

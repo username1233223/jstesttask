@@ -8,6 +8,37 @@ import { Request, Response } from 'express';
 import { ApiCallback, ClientInfo } from '../services/udp/types';
 import { Content } from '../../shared/services/udp/types';
 
+function exceptionRaiser(msg: KEYPROTECTED_ERROR) {
+  return (): void => {
+    throw new Error(msg);
+  };
+}
+
+function getKeyContent(keyPath?: string): string | undefined {
+  let keyContent: string | undefined;
+  if (keyPath) {
+    if (fs.existsSync(keyPath)) {
+      const stats = fs.statSync(keyPath);
+
+      if (stats.isDirectory()) {
+        const keyFile = path.join(keyPath, 'key.txt');
+        if (fs.existsSync(keyFile)) {
+          keyContent = fs.readFileSync(keyFile, 'utf-8');
+        } else {
+          keyContent = undefined;
+        }
+      } else {
+        keyContent = fs.readFileSync(keyPath, 'utf-8');
+      }
+    } else {
+      keyContent = undefined;
+    }
+  } else {
+    keyContent = defaultAuthKey.toString();
+  }
+  return keyContent;
+}
+
 export function keyProtected(keyPath?: string) {
   return function (
     target: Middleware,
@@ -15,33 +46,10 @@ export function keyProtected(keyPath?: string) {
     descriptor: PropertyDescriptor
   ): PropertyDescriptor {
     const originalMethod = descriptor.value;
-    const exceptionRaiser = (msg: KEYPROTECTED_ERROR) => {
-      return (): void => {
-        throw new Error(msg);
-      };
-    };
-    let keyContent: string;
-    if (keyPath) {
-      if (fs.existsSync(keyPath)) {
-        const stats = fs.statSync(keyPath);
-
-        if (stats.isDirectory()) {
-          const keyFile = path.join(keyPath, 'key.txt');
-          if (fs.existsSync(keyFile)) {
-            keyContent = fs.readFileSync(keyFile, 'utf-8');
-          } else {
-            descriptor.value = exceptionRaiser(KEYPROTECTED_ERROR.KEYPROTECTED_MISSING_KEYFILE);
-            return descriptor;
-          }
-        } else {
-          keyContent = fs.readFileSync(keyPath, 'utf-8');
-        }
-      } else {
-        descriptor.value = exceptionRaiser(KEYPROTECTED_ERROR.KEYPROTECTED_MISSING_KEYFILE);
-        return descriptor;
-      }
-    } else {
-      keyContent = defaultAuthKey.toString();
+    let keyContent = getKeyContent(keyPath);
+    if (!keyContent) {
+      descriptor.value = exceptionRaiser(KEYPROTECTED_ERROR.KEYPROTECTED_MISSING_KEYFILE);
+      return descriptor;
     }
 
     if (keyContent.length < 8) {

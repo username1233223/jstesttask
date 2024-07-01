@@ -109,6 +109,7 @@ class UdpServerService extends UdpService {
       if (!capacities.includes(functionName)) {
         throw new Error(UDP_RESULT_ERROR.NO_SUCH_FUNCTION);
       }
+
       const promiseSend = new Promise<Content>((resolve, reject) => {
         const messageId = randomUUID();
         const timeout = setTimeout(() => {
@@ -119,6 +120,7 @@ class UdpServerService extends UdpService {
             error: UDP_RESULT_ERROR.CALL_FUNCTION_TIMEOUT,
           });
         }, INACTIVITY_THRESHOLD);
+
         const okHandler = (content: Content): void => {
           if (messageId == content.messageId) {
             this.off(UDP_PROTOCOL_MESSAGES.RESULT_ERROR, errorHandler);
@@ -130,7 +132,7 @@ class UdpServerService extends UdpService {
         };
         const errorHandler = (content: Content): void => {
           if (messageId == content.messageId) {
-            this.off(UDP_PROTOCOL_MESSAGES.RESULT_ERROR, okHandler);
+            this.off(UDP_PROTOCOL_MESSAGES.RESULT_OK, okHandler);
             clearTimeout(timeout);
             reject(content);
           } else {
